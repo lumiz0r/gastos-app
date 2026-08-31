@@ -14,14 +14,16 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.lumiz0r.gastosapp"
+      "bundleIdentifier": "com.lumiz0r.gastosapp",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1e1b4b"
       },
-      "package": "com.lumiz0r.gastosapp"
+      "package": "com.lumiz0r.gastosapp",
+      "versionCode": 1
     },
     "web": {
       "bundler": "metro",
