@@ -20,7 +20,7 @@ import {
   formatCurrency,
   groupByCategory,
 } from '../../lib/utils';
-import { getCategoryMeta } from '../../lib/types';
+import { getCategoryMeta } from '../../lib/categories';
 
 const W = Dimensions.get('window').width - 64;
 

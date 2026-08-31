@@ -18,7 +18,7 @@ import {
   totalAmount,
   groupByCategory,
 } from '../../lib/utils';
-import { getCategoryMeta } from '../../lib/types';
+import { getCategoryMeta } from '../../lib/categories';
 
 export default function HomeScreen() {
   const { expenses, loading, refresh, remove } = useExpenses();

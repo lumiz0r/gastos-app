@@ -1,4 +1,5 @@
-import { Expense, getCategoryMeta } from './types';
+import { Expense } from './types';
+import { getCategoryMeta } from './categories';
 
 export function formatCurrency(amount: number): string {
   return amount.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });

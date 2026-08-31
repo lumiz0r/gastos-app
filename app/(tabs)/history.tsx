@@ -13,10 +13,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useExpenses } from '../../lib/useExpenses';
 import { formatCurrency, formatDate, totalAmount } from '../../lib/utils';
-import { CATEGORIES, getCategoryMeta, Expense } from '../../lib/types';
+import { Expense } from '../../lib/types';
+import { getCategoryMeta, useCategories } from '../../lib/categories';
 
 export default function HistoryScreen() {
   const { expenses, loading, refresh, remove } = useExpenses();
+  const categories = useCategories();
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('');
 
@@ -108,7 +110,7 @@ export default function HistoryScreen() {
         >
           <Text style={[s.filterLabel, !filterCat && s.filterLabelActive]}>Todas</Text>
         </TouchableOpacity>
-        {CATEGORIES.filter((c) => expenses.some((e) => e.category === c.name)).map((cat) => (
+        {categories.filter((c) => expenses.some((e) => e.category === c.name)).map((cat) => (
           <TouchableOpacity
             key={cat.name}
             style={[s.filterBtn, filterCat === cat.name && { borderColor: cat.color, backgroundColor: cat.color + '22' }]}

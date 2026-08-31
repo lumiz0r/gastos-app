@@ -13,16 +13,47 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useExpenses } from '../../lib/useExpenses';
-import { CATEGORIES, getCategoryMeta } from '../../lib/types';
+import {
+  getCategoryMeta,
+  useCategories,
+  isCustom,
+  deleteCategory,
+} from '../../lib/categories';
+import NewCategoryModal from '../../components/NewCategoryModal';
 import { toISODate } from '../../lib/utils';
 
 export default function AddScreen() {
   const { add } = useExpenses();
+  const categories = useCategories();
+  const [showNewCategory, setShowNewCategory] = useState(false);
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [note, setNote] = useState('');
   const [date, setDate] = useState(toISODate(new Date()));
   const [saving, setSaving] = useState(false);
+
+  const handleRemoveCategory = (name: string) => {
+    if (!isCustom(name)) return;
+    Alert.alert(
+      'Eliminar categoría',
+      `¿Eliminar "${name}"? Los gastos ya guardados se mantienen.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteCategory(name);
+              if (category === name) setCategory('');
+            } catch (err) {
+              Alert.alert('No se pudo eliminar', (err as Error).message);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleSave = async () => {
     const parsed = parseFloat(amount.replace(',', '.'));
@@ -85,7 +116,7 @@ export default function AddScreen() {
           {/* Category */}
           <Text style={s.label}>Categoría</Text>
           <View style={s.categoryGrid}>
-            {CATEGORIES.map((cat) => {
+            {categories.map((cat) => {
               const selected = category === cat.name;
               return (
                 <TouchableOpacity
@@ -95,13 +126,21 @@ export default function AddScreen() {
                     selected && { backgroundColor: cat.color + '33', borderColor: cat.color },
                   ]}
                   onPress={() => setCategory(cat.name)}
+                  onLongPress={() => handleRemoveCategory(cat.name)}
                 >
                   <Text style={s.catEmoji}>{cat.icon}</Text>
                   <Text style={[s.catLabel, selected && { color: cat.color }]}>{cat.name}</Text>
                 </TouchableOpacity>
               );
             })}
+            <TouchableOpacity style={[s.catBtn, s.catBtnNew]} onPress={() => setShowNewCategory(true)}>
+              <Text style={s.catNewIcon}>+</Text>
+              <Text style={s.catNewLabel}>Nueva</Text>
+            </TouchableOpacity>
           </View>
+          {categories.some((c) => isCustom(c.name)) && (
+            <Text style={s.hint}>Mantén pulsada una categoría propia para eliminarla.</Text>
+          )}
 
           {/* Note */}
           <Text style={s.label}>Nota (opcional)</Text>
@@ -140,6 +179,15 @@ export default function AddScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <NewCategoryModal
+        visible={showNewCategory}
+        onClose={() => setShowNewCategory(false)}
+        onCreated={(name) => {
+          setCategory(name);
+          setShowNewCategory(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -185,6 +233,10 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#312e81',
   },
+  catBtnNew: { borderStyle: 'dashed', borderColor: '#4f46e5' },
+  catNewIcon: { fontSize: 16, color: '#818cf8', fontWeight: '700' },
+  catNewLabel: { fontSize: 13, color: '#818cf8', fontWeight: '600' },
+  hint: { fontSize: 12, color: '#64748b', marginTop: 10 },
   catEmoji: { fontSize: 16 },
   catLabel: { fontSize: 13, color: '#94a3b8', fontWeight: '500' },
   preview: {
