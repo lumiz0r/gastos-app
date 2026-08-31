@@ -9,7 +9,7 @@ import {
   SafeAreaView,
   Dimensions,
 } from 'react-native';
-import { PieChart, BarChart } from 'react-native-chart-kit';
+import Svg, { G, Path, Circle, Text as SvgText } from 'react-native-svg';
 import { useExpenses } from '../../lib/useExpenses';
 import {
   filterByMonth,
@@ -22,9 +22,91 @@ import {
 } from '../../lib/utils';
 import { getCategoryMeta } from '../../lib/types';
 
-const W = Dimensions.get('window').width - 32;
+const W = Dimensions.get('window').width - 64;
 
 type Period = '7d' | '30d' | 'month';
+
+// Simple SVG pie chart
+function PieChart({ data }: { data: { name: string; amount: number; color: string }[] }) {
+  const size = 180;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 70;
+  const innerR = 40;
+
+  const total = data.reduce((s, d) => s + d.amount, 0);
+  if (total === 0) return null;
+
+  let angle = -Math.PI / 2;
+  const slices = data.map((d) => {
+    const start = angle;
+    const sweep = (d.amount / total) * 2 * Math.PI;
+    angle += sweep;
+    return { ...d, start, sweep };
+  });
+
+  const describeArc = (startA: number, sweepA: number) => {
+    if (sweepA >= 2 * Math.PI) sweepA = 2 * Math.PI - 0.001;
+    const x1 = cx + r * Math.cos(startA);
+    const y1 = cy + r * Math.sin(startA);
+    const x2 = cx + r * Math.cos(startA + sweepA);
+    const y2 = cy + r * Math.sin(startA + sweepA);
+    const ix1 = cx + innerR * Math.cos(startA);
+    const iy1 = cy + innerR * Math.sin(startA);
+    const ix2 = cx + innerR * Math.cos(startA + sweepA);
+    const iy2 = cy + innerR * Math.sin(startA + sweepA);
+    const large = sweepA > Math.PI ? 1 : 0;
+    return `M ${ix1} ${iy1} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${innerR} ${innerR} 0 ${large} 0 ${ix1} ${iy1} Z`;
+  };
+
+  return (
+    <Svg width={size} height={size}>
+      {slices.map((s) => (
+        <Path key={s.name} d={describeArc(s.start, s.sweep)} fill={s.color} />
+      ))}
+      <Circle cx={cx} cy={cy} r={innerR - 2} fill="#0f0e2a" />
+    </Svg>
+  );
+}
+
+// Simple bar chart using Views
+function BarChart({ data }: { data: { labels: string[]; datasets: { data: number[] }[] } }) {
+  const values = data.datasets[0].data;
+  const max = Math.max(...values, 0.01);
+  const barH = 140;
+
+  return (
+    <View style={bc.container}>
+      {/* Bars */}
+      <View style={bc.barsRow}>
+        {values.map((v, i) => (
+          <View key={i} style={bc.barCol}>
+            <Text style={bc.value}>{v > 0 ? `${v.toFixed(0)}€` : ''}</Text>
+            <View style={[bc.barTrack, { height: barH }]}>
+              <View
+                style={[
+                  bc.barFill,
+                  { height: (v / max) * barH, backgroundColor: v === max ? '#818cf8' : '#4f46e5' },
+                ]}
+              />
+            </View>
+            <Text style={bc.label}>{data.labels[i]}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const bc = StyleSheet.create({
+  container: { paddingTop: 8 },
+  barsRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  barCol: { flex: 1, alignItems: 'center', gap: 4 },
+  value: { color: '#94a3b8', fontSize: 9, textAlign: 'center' },
+  barTrack: { width: '70%', justifyContent: 'flex-end', borderRadius: 4 },
+  barFill: { width: '100%', borderRadius: 4, minHeight: 3 },
+  label: { color: '#64748b', fontSize: 11, marginTop: 4 },
+});
 
 export default function StatsScreen() {
   const { expenses, refresh } = useExpenses();
@@ -46,15 +128,6 @@ export default function StatsScreen() {
   const barData = getBarData(expenses);
   const total = totalAmount(filtered);
   const byCat = Object.entries(groupByCategory(filtered)).sort(([, a], [, b]) => b - a);
-
-  const chartConfig = {
-    backgroundGradientFrom: '#1e1b4b',
-    backgroundGradientTo: '#1e1b4b',
-    color: (opacity = 1) => `rgba(129, 140, 248, ${opacity})`,
-    labelColor: () => '#94a3b8',
-    barPercentage: 0.6,
-    propsForBackgroundLines: { stroke: '#312e81' },
-  };
 
   return (
     <SafeAreaView style={s.safe}>
@@ -85,51 +158,29 @@ export default function StatsScreen() {
         {/* Bar Chart - Last 7 days */}
         <View style={s.chartBox}>
           <Text style={s.chartTitle}>Gastos por día (últimos 7 días)</Text>
-          {barData.datasets[0].data.some((v) => v > 0) ? (
-            <BarChart
-              data={barData}
-              width={W}
-              height={200}
-              chartConfig={chartConfig}
-              style={s.chart}
-              showValuesOnTopOfBars
-              fromZero
-              yAxisLabel=""
-              yAxisSuffix="€"
-            />
-          ) : (
-            <Text style={s.empty}>Sin datos en este período</Text>
-          )}
+          <BarChart data={barData} />
         </View>
 
-        {/* Pie Chart */}
+        {/* Pie Chart + Legend */}
         {pieData.length > 0 ? (
           <View style={s.chartBox}>
             <Text style={s.chartTitle}>Distribución por categoría</Text>
-            <PieChart
-              data={pieData}
-              width={W}
-              height={200}
-              chartConfig={chartConfig}
-              accessor="amount"
-              backgroundColor="transparent"
-              paddingLeft="0"
-              center={[0, 0]}
-              hasLegend={false}
-            />
-            {/* Custom Legend */}
-            <View style={s.legend}>
-              {pieData.map((item) => {
-                const pct = total > 0 ? ((item.amount / total) * 100).toFixed(1) : '0';
-                return (
-                  <View key={item.name} style={s.legendRow}>
-                    <View style={[s.legendDot, { backgroundColor: item.color }]} />
-                    <Text style={s.legendName}>{getCategoryMeta(item.name).icon} {item.name}</Text>
-                    <Text style={s.legendPct}>{pct}%</Text>
-                    <Text style={s.legendAmt}>{formatCurrency(item.amount)}</Text>
-                  </View>
-                );
-              })}
+            <View style={s.pieRow}>
+              <PieChart data={pieData} />
+              <View style={s.legend}>
+                {pieData.slice(0, 6).map((item) => {
+                  const pct = total > 0 ? ((item.amount / total) * 100).toFixed(0) : '0';
+                  return (
+                    <View key={item.name} style={s.legendRow}>
+                      <View style={[s.legendDot, { backgroundColor: item.color }]} />
+                      <Text style={s.legendName} numberOfLines={1}>
+                        {getCategoryMeta(item.name).icon} {item.name}
+                      </Text>
+                      <Text style={s.legendPct}>{pct}%</Text>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           </View>
         ) : (
@@ -138,7 +189,7 @@ export default function StatsScreen() {
           </View>
         )}
 
-        {/* Category Breakdown */}
+        {/* Category Breakdown with progress bars */}
         {byCat.length > 0 && (
           <View style={s.chartBox}>
             <Text style={s.chartTitle}>Desglose por categoría</Text>
@@ -156,7 +207,7 @@ export default function StatsScreen() {
                       <Text style={s.bAmt}>{formatCurrency(amount)}</Text>
                     </View>
                     <View style={s.barTrack}>
-                      <View style={[s.barFill, { width: `${pct}%`, backgroundColor: meta.color }]} />
+                      <View style={[s.barFill, { width: `${pct}%` as any, backgroundColor: meta.color }]} />
                     </View>
                     <Text style={s.bPct}>{pct.toFixed(1)}% del total</Text>
                   </View>
@@ -207,13 +258,12 @@ const s = StyleSheet.create({
     borderColor: '#312e81',
   },
   chartTitle: { color: '#e2e8f0', fontWeight: '700', fontSize: 15, marginBottom: 12 },
-  chart: { borderRadius: 12, marginLeft: -16 },
-  legend: { marginTop: 12, gap: 8 },
-  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendName: { flex: 1, color: '#e2e8f0', fontSize: 13 },
-  legendPct: { color: '#94a3b8', fontSize: 12, width: 42, textAlign: 'right' },
-  legendAmt: { color: '#818cf8', fontSize: 13, fontWeight: '700', width: 72, textAlign: 'right' },
+  pieRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  legend: { flex: 1, gap: 8 },
+  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  legendName: { flex: 1, color: '#e2e8f0', fontSize: 12 },
+  legendPct: { color: '#818cf8', fontSize: 12, fontWeight: '700' },
   breakdownRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 12 },
   bIcon: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   bEmoji: { fontSize: 20 },
